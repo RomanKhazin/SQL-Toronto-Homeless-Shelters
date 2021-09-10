@@ -1,0 +1,150 @@
+SELECT *
+  FROM shelters
+  LIMIT 100;
+
+--The following 4 queries will measure usage rates of Toronto homeless shelters, each grouped by a different variable
+
+-- Total users by date
+SELECT occupancy_date,
+       SUM(service_user_count) AS daily_user_count
+  FROM shelters
+ GROUP BY 1
+ ORDER BY 1;
+ 
+ --Total users by program area
+SELECT program_area,
+       SUM(service_user_count) AS total_user_count
+  FROM shelters
+ GROUP BY 1
+ ORDER BY 2 DESC;
+ 
+--Total users by sector
+SELECT sector,
+       SUM(service_user_count) AS total_user_count
+  FROM shelters
+ GROUP BY 1
+ ORDER BY 2 DESC;
+ 
+--Total users by city
+SELECT location_city,
+       SUM(service_user_count) AS total_user_count
+  FROM shelters
+ GROUP BY 1
+ ORDER BY 2 DESC;
+ 
+--Some of the rows for location_city in the previous query are empty and need to be filled in
+--Two of the locations with empty location_city rows are Nellie's Women's Shelter and SSHA Etobicoke Hotel Program
+--Upon further research, they are located in Toronto and Etobicoke. The following updates fill in this data.
+
+UPDATE shelters
+SET location_city = 'Toronto' 
+WHERE location_name = 'Nellie''s Women''s Shelter'
+
+UPDATE shelters
+SET location_city = 'Etobicoke'
+WHERE location_name = 'SSHA Etobicoke Hotel Program'
+
+--The previous query grouping by location_city is run again, this time with the data cleaned up and all rows filled in
+SELECT location_city,
+       SUM(service_user_count) 
+  FROM shelters
+ GROUP BY 1
+ ORDER BY 2 DESC;
+ 
+--The following queries compare and contrast the availalbility of rooms vs beds in homeless shelters
+
+--This query looks at the average daily capacity of rooms vs beds across all locations
+WITH capacity_sum AS (
+    SELECT occupancy_date,
+           SUM(capacity_actual_bed) AS bed_capacity,
+           SUM(capacity_actual_room) AS room_capacity
+      FROM shelters
+     GROUP BY occupancy_date
+)
+SELECT ROUND(AVG(bed_capacity), 0) AS daily_bed_capacity,
+       ROUND(AVG(room_capacity), 0) AS daily_room_capacity
+  FROM capacity_sum
+  
+--A comparison of the average daily number of occupied and unoccupied rooms and beds across all locations
+WITH occupied_sum AS (
+    SELECT occupancy_date,
+           SUM(occupied_beds) AS bed_occupied,
+           SUM(unoccupied_beds) AS bed_unoccupied,
+           SUM(occupied_rooms) AS room_occupied,
+           SUM(unoccupied_rooms) AS room_unoccupied
+      FROM shelters
+     GROUP BY occupancy_date
+)
+SELECT CAST (AVG(bed_occupied) AS INT) AS bed_occupied,
+       CAST (AVG(bed_unoccupied) AS INT) AS bed_unoccupied,
+       CAST (AVG(room_occupied) AS INT) AS room_occupied,
+       CAST (AVG(room_unoccupied) AS INT) AS room_unoccupied
+  FROM occupied_sum
+
+--Average daily capacity of beds, grouped by sector
+SELECT sector,
+       ROUND( (SUM(capacity_actual_bed) / COUNT(DISTINCT occupancy_date) ), 1) AS avg_beds_available
+  FROM shelters
+ GROUP BY sector
+ 
+--Average daily capacity of rooms, grouped by sector
+SELECT sector,
+       ROUND( (SUM(capacity_actual_room) / COUNT(DISTINCT occupancy_date) ), 1) AS avg_rooms_available
+  FROM shelters
+ GROUP BY sector
+ 
+--Total number of occupied, unoccupied, and unavailable beds by month
+SELECT strftime('%m', occupancy_date) AS month,
+       SUM(occupied_beds) AS occupied_beds,
+       SUM(unoccupied_beds) AS unoccupied_beds,
+       SUM(unavailable_beds) AS unavailable_beds
+  FROM shelters
+ GROUP BY 1
+ 
+--Total number of occupied, unoccupied, and unavailable rooms by month
+SELECT strftime('%m', occupancy_date) AS month,
+       SUM(occupied_rooms) AS occupied_rooms,
+       SUM(unoccupied_rooms) AS unoccupied_rooms,
+       SUM(unavailable_rooms) AS unavailable_rooms
+  FROM shelters
+ GROUP BY 1
+ 
+--A list of locations with the highest percentage of unavailable beds, comparing the average daily number of unavailable beds to the average daily number of total beds
+--Some of the columns are not a numeric data type and need to be cast as REAL in order for the WHERE total_bed_avg > 0 condition to apply
+WITH unavailable_beds_table AS (
+    SELECT organization_name,
+           location_name,
+           CAST ((SUM(unavailable_beds) / COUNT(occupancy_date)) AS REAL) AS unavailable_bed_avg,
+           CAST ((SUM(occupied_beds) + SUM(unoccupied_beds) + SUM(unavailable_beds) ) / COUNT(occupancy_date) AS REAL) AS total_bed_avg
+      FROM shelters
+     GROUP BY 1,
+              2
+)
+SELECT organization_name,
+       location_name,
+       ROUND(unavailable_bed_avg, 1) AS unavailable_bed_avg,
+       ROUND(total_bed_avg, 0) AS total_bed_avg,
+       ROUND(unavailable_bed_avg / total_bed_avg * 100, 1) AS unavailable_bed_pct
+  FROM unavailable_beds_table
+ WHERE total_bed_avg > 0
+ ORDER BY 5 DESC
+ 
+--A list of locations with the highest percentage of unavailable rooms, comparing the average daily number of unavailable rooms to the average daily number of total rooms
+--As with the previous query, some of the columns are not a numeric data type and need to be cast as REAL in order for the WHERE total_room_avg > 0 condition to apply
+WITH unavailable_rooms_table AS (
+    SELECT organization_name,
+           location_name,
+           CAST ((SUM(unavailable_rooms) / COUNT(occupancy_date)) AS REAL) AS unavailable_room_avg,
+           CAST ((SUM(occupied_rooms) + SUM(unoccupied_rooms) + SUM(unavailable_rooms) ) / COUNT(occupancy_date) AS REAL) AS total_room_avg
+      FROM shelters
+     GROUP BY 1,
+              2
+)
+SELECT organization_name,
+       location_name,
+       ROUND(unavailable_room_avg, 1) AS unavailable_room_avg,
+       ROUND(total_room_avg, 0) AS total_room_avg,
+       ROUND(unavailable_room_avg / total_room_avg * 100, 1) AS unavailable_room_pct
+  FROM unavailable_rooms_table
+ WHERE total_room_avg > 0
+ ORDER BY 5 DESC
