@@ -1,3 +1,11 @@
+--This project looks at the availability of homeless shelter spaces in Toronto in the first six months of 2021
+--The goal is to get a greater understanding of the shelters available and the populations served, and to see any gaps that need addressing.
+--The data is cleaned, missing data points are filled in, and the data is summarized.
+--I then perform further calculations to gain greater insights, such as monthly variation, and list of shelters that have more or less availability.
+--The results of the queries are visualized in Tableau and can be viewed at https://public.tableau.com/app/profile/roman.khazin/viz/TorontoChildcare/TorontoChildcareSummary
+--And at https://public.tableau.com/app/profile/roman.khazin/viz/TorontoChildcareDetailed/Dashboard1
+--The data is available from the City of Toronto Open Data Portal at https://open.toronto.ca/dataset/daily-shelter-overnight-service-occupancy-capacity/
+
 SELECT *
   FROM shelters
   LIMIT 100;
